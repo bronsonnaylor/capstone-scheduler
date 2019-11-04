@@ -29,7 +29,7 @@ def add_user():
 def add_event():
     new_event = Event()
     
-    startTimeObject = datetime(int(request.json["event_start_time"]))
+    startTimeObject = datetime.strptime(request.json["event_start_time"], "%Y-%m-%d %H:%M:%S")
     new_event.start_time = startTimeObject
     # new_event.start_time = request.json["event_start_time"]
     new_event.event_name = request.json["event_name"]
