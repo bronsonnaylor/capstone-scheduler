@@ -1,5 +1,7 @@
 <template>
   <div id="app">
+    <h1>Event scheduler</h1>
+
     <!-- Crude login -->
     <input v-if="this.currentUser == '' " v-model="inputUserName" v-on:keyup.enter="submitNewUsername"/>
     <button v-if="this.currentUser == '' " @click="submitNewUsername">Enter a username</button>
@@ -228,7 +230,6 @@ export default {
       axios.get("http://worldtimeapi.org/api/timezone")
       .then((response) => {
         this.zones = response.data
-        console.log(this.zones)
       })
     },
     selectTimezone() {
@@ -248,7 +249,7 @@ export default {
   }
   #app{
     background-image: url("assets/photo-1455612693675-112974d4880b.jpeg");
-    background-size: 200px;
+    background-size: 1000px;
   }
   textarea {
     border: 2px solid black;

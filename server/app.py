@@ -17,11 +17,13 @@ def create_app():
 
     if os.environ["RUN_ENVIRONMENT"] == 'network':
         app.config['SQLALCHEMY_DATABASE_URI'] = "postgresql+psycopg2://{user}:{pw}@{url}/{db}".format(user=os.environ["DB_USER"],pw=os.environ["DB_PASS"],url=os.environ["DB_URL"],db=os.environ["DB_NAME"])
+        print("network database")
     else:
         app.config['SQLALCHEMY_DATABASE_URI'] = "sqlite:///{}".format(os.path.join(project_dir, "userdata.db"))
-
+        print("local database")
+    
     # app.config['SQLALCHEMY_DATABASE_URI'] = "sqlite:///{}".format(os.path.join(project_dir, "userdata.db"))
-    # app.config['SQLALCHEMY_DATABASE_URI'] = "postgresql+psycopg2://{user}:{pw}@{url}/{db}".format(user=os.environ["DB_USER"],pw=os.environ["DB_PASS"],url=os.environ["DB_URL"],db=os.environ["DB_NAME"])
+
     app.config['SQLALCHEMY_ECHO'] = True
     db.init_app(app)
     app.register_blueprint(user_api)
