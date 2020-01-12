@@ -2,3 +2,5 @@ client/node_modules
 server/dist
 db/*
 personal/*
+server/.env
+server/secrets.py

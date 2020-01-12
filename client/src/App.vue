@@ -1,64 +1,69 @@
 <template>
-  <div id="app">
-    <!-- Crude login -->
-    <input v-if="this.currentUser == '' " v-model="inputUserName" v-on:keyup.enter="submitNewUsername"/>
-    <button v-if="this.currentUser == '' " @click="submitNewUsername">Enter a username</button>
-    <p v-if="this.currentUser != '' ">Welcome {{ currentUser }}!</p>
-    <button v-if="this.currentUser != '' " @click="switchUser">Change user</button>
-    <hr>
-
-    <!-- Make API call to find time at specific location -->
-    <input type="checkbox" class="check" id="timeCheckbox" v-model="timeCheckbox">
-    <label for="timeCheckbox">Check this box to find the current time for a specific location</label>
-    <br>
-    <div v-if="this.timeCheckbox == true">
-      <button @click="updateZones" v-on:keyup.enter="updateZones">Update timezones</button>
-      <select v-model="chosenTimezoneNumber" @click="selectTimezone">
-        <option v-for="(zone, key) in zones" :value="key">
-          {{ zone }}
-        </option>
-      </select>
-      <p>{{ chosenTimezoneString }}</p>
-    </div>
-
-    <!-- Enter event information -->
-    <input type="checkbox" class="check" id="rangeCheckbox" v-model="checkbox">
-    <label for="rangeCheckbox">Check this box to select a start and end time.</label>
-    <br>
-    <p v-if="!checkbox">Select start time.</p>
-    <p v-if="checkbox">Select start and end time.</p>
-    <date-picker v-if="!checkbox" v-model="datetime" lang="en" confirm type="datetime"  format="YYYY-MM-DD HH:mm:ss" width="500" placeholder="Select Date and Time"></date-picker>
-    <date-picker v-if="checkbox" v-model="range" lang="en" range confirm type="datetime" format="YYYY-MM-DD HH:mm:ss" width="500" placeholder="Select Date and Time"></date-picker>
-    <p>Enter event name here.</p>
-    <input v-model="eventName" v-on:keyup.enter="submitNewEvent"/>
-    <p>Enter event details here.</p>
-    <textarea v-model="eventDetails" v-on:keyup.enter="submitNewEvent"/>
-    <br>
-    <p id="failedEntry" v-if="failedEntry == true">You must be logged in, set a time, enter an event name, and enter a description.</p>
-    <button @click="submitNewEvent">Submit</button>
-    <hr>
-
-    <!-- list all events for current user -->
-    <h2>My events</h2>
-    <button @click="getEvents">Update my events</button>
-    <br>
-    <div id=eventList>
-      <ul v-for="(event, index) in zippedEvent" :key="index">
-        <li> {{ event[0] }} </li>
-        <li> {{ event[1] }} </li>
-        <li> {{ event[2] }} </li>
-        <li> {{ event[3] }} </li>
-        <button @click="deleteEvent(event[4])">Delete event</button>
-        <p>---------------------------------</p>
-      </ul>
-    </div>
+  <div id="app" >
     
+    <div v-if="userLoggedIn" >
+      
+    <button v-on:click="logout()">Logout</button>
+
+  <div class="calendar_eventdetails"> 
+    <div style="width:100%;">
+      <calendarView
+      :calendarEvents='zippedEvent'
+      @eventClick='eventClick'
+      @dateClick='dateClick'
+      @select='select'
+      @eventDrop='eventDrop'
+      @eventResize='eventResize'
+      />
+    </div>
+    <div class="centeredModal">
+      <eventDetailsModal
+        v-if="isModalVisible" 
+        @close="closeModal()"
+        :title='eventClickTitle'
+        :details='eventClickDescription'
+        :start='eventClickStart'
+        :end='eventClickEnd'
+        :invites='eventInvites'
+        @deleteEvent='deleteEventNow'
+      />
+    </div>
+    <!-- Enter event information -->
+    <div class="centeredModal">
+      <!-- Modal window -->
+      <addEventModal 
+      v-if="showAddEventModal==true"
+      @close="closeModal()"
+      :date='newEventClickDate'
+      :userID='currentUserID'
+      :clearEvents='clearEventList'
+      :eventsList='getEvents'
+      :startDate='newEventStartDate'
+      :endDate='newEventEndDate'
+      :allDay="newEventAllDay"
+      />
+    </div>
   </div>
+  </div>
+  
+  <div v-else-if="userRegistrationActive" >
+      <register v-on:enterNewUserInfo="enterNewUserInfo" />
+  </div>
+  <div v-else >
+      <login v-on:enterLoginInfo="enterLoginInfo" or v-on:register="register" />
+  </div>
+  {{this.selectedEventId}}
+  </div>
+  
 </template>
 
 <script>
-import DatePicker from 'vue2-datepicker'
 import axios from 'axios'
+import login from './components/login.vue'
+import register from './components/register.vue'
+import calendarView from './components/calendarView.vue'
+import eventDetailsModal from './components/eventDetailsModal.vue'
+import addEventModal from './components/addEventModal.vue'
 
 let moment = require('moment')
 
@@ -66,108 +71,186 @@ export default {
   name: 'app',
   data() {
     return {
+      userLoggedIn: false,
+      userRegistrationActive: false,
+      isModalVisible: false,
+      currentEventId: '',
       moment: moment,
       inputUserName: '',
-      currentUser: '',
       currentUserID: '',
-      eventName: '',
-      eventDetails: '',
-      eventID: '',
+      currentUser: '',
       eventResponseNames: [],
       eventResponseDetails: [],
       eventResponseStartTime: [],
       eventResponseEndTime: [],
       eventResponseID: [],
       zippedEvent: [],
-      sharedUsers: [],
-      chosenTimezoneNumber: null,
-      chosenTimezoneName: "",
-      chosenTimezoneString: "",
-      timeCheckbox: false,
-      checkbox: false,
-      datetime: '',
-      zones: [],
-      timezone: [],
-      timezoneStart: 0,
-      timezoneEnd: 0,
-      startTime: '',
-      endTime: '',
-      range: [],
-      failedEntry: false
+      sharedUsers: [], 
+      newEventClickDate: '',
+      showAddEventModal: false,
+      selectedEventId: '',
+      eventInvites: '',
+      dragEvent: false
     }        
   },
   components: {
-    DatePicker
+    login,
+    register,
+    calendarView,
+    eventDetailsModal,
+    addEventModal,
   },
   methods: {
-    submitNewEvent() {
-      this.clearEventList()
-      this.failedEntry = false
 
-      // Selects start and end times depending on if range is selected or not.
-      this.setStartTime()
+    checkSession() {
+        axios.get('checksession')
+        .then((resp) => {
+            this.userLoggedIn = resp.data.session
 
+            this.getCurrentUserID()
+            this.getEvents()
+      })
+    },
+
+    logout() {
+      axios.get('logout')
+         .then((resp) => {
+            this.userLoggedIn = false;
+            this.userRegistrationActive = false;
+    })
+      
+    },
+    enterLoginInfo (value) { 
+     this.userLoggedIn = value
+
+     if (this.userLoggedIn === true) {
+        this.getCurrentUserID()
+        this.getEvents()
+     }
+    },
+
+    register (value) {
+     this.userRegistrationActive = value
+     
+    },
+
+    enterNewUserInfo (value) {
+      this.userLoggedIn = value
+      if (this.userLoggedIn === true)
+        this.getCurrentUserID();
+      
+    },
+
+    sendInviteEmails(){
+      axios.post('/sendinvites', {
+        emails: this.emails,
+        event_id: this.currentEventId
+      }).then(() => {
+        this.currentEventId = []
+      })
+  },
+ 
+    eventClick(title, description, start, end, id) {
+      this.eventClickTitle = title
+      this.eventClickDescription = description
+      this.eventClickStart = start
+      this.eventClickEnd = end
+      this.isModalVisible = true
+      this.getInvites(id)
+      this.selectedEventId = id
+    },
+    getInvites(id) {
+      axios.post('/getinvites',{
+        event_id: id
+      }).then(resp => {
+        this.eventInvites = resp.data.all_invites
+      })
+    },
+    dateClick(date){
+      this.newEventClickDate = date;
+      this.showAddEventModal = true;
+    },
+    select(start, end, fullDay){
+      this.showAddEventModal = false;
+      this.newEventStartDate = start;
+      this.newEventEndDate = end;
+      this.showAddEventModal = true;
+      this.newEventAllDay = fullDay;
+    },
+    eventDrop(dragID, dragStart, dragEnd, dragName){
       // Sets start time to UTC
-      let mStartTime = moment.utc(this.startTime)
-      this.startTime = mStartTime.toISOString()
-      this.startTime = mStartTime.format("YYYY-MM-DD HH:mm:ss")
+      let dragEventStartDate = moment.utc(dragStart)
+      dragStart = dragEventStartDate.toISOString()
+      dragStart = dragEventStartDate.format("YYYY-MM-DD HH:mm:ss")
 
       // Sets end time to UTC.
-      let mEndTime = moment.utc(this.endTime)
-      this.endTime = mEndTime.toISOString()
-      this.endTime = mEndTime.format("YYYY-MM-DD HH:mm:ss")
+      let dragEventEndDate = moment.utc(dragEnd)
+      dragEnd = dragEventEndDate.toISOString()
+      dragEnd = dragEventEndDate.format("YYYY-MM-DD HH:mm:ss")
+      this.dragEvent = true;
 
-      if (this.currentUserID == "" || this.eventName == "" || this.startTime == "") {
-        this.failedEntry = true
-        return
-      }
-
-      axios.post('/newevent', { owner_id: this.currentUserID, event_name: this.eventName, event_details: this.eventDetails, event_start_time: this.startTime, event_end_time: this.endTime})
-      .then(() => {
-        
-      })
-        this.eventName = ''
-        this.eventDetails = ''
-        this.startTime = ''
-        this.range = ''
-        this.endTime = ''
-        this.getEvents()
-    },
-    deleteEvent(id) {
-      // There is currently an issue with the delete button failing to remove list items sometimes.
-      // Refreshing the page restores proper functionality.
-      // Update: perhaps it's related to a potential race condition, where the updated list isn't properly rendered in time.
-      axios.delete('/deleteevent', {data: { event_id: id } })
+      axios.patch('/updateevent', { id: dragID, start_time: dragStart, end_time: dragEnd, drag: this.dragEvent})
       .then(() => {
         this.getEvents()
+      });
+      axios.post('/eventchanged', {
+        id: dragID,
+        start_time: dragStart,
+        end_time: dragEnd,
+      })
+      .then(() => {
       })
     },
-    setStartTime() {
-      if (this.range.length != 0) {
-        this.startTime = this.range[0]
-        this.endTime = this.range[1]
-        return
-      }
-      this.startTime = this.datetime
-      this.endTime = this.datetime
-      return
+    eventResize(resizeID, resizeStart, resizeEnd){
+      // Sets start time to UTC
+      let resizeEventStartDate = moment.utc(resizeStart)
+      resizeStart = resizeEventStartDate.toISOString()
+      resizeStart = resizeEventStartDate.format("YYYY-MM-DD HH:mm:ss")
+
+      // Sets end time to UTC.
+      let resizeEventEndDate = moment.utc(resizeEnd)
+      resizeEnd = resizeEventEndDate.toISOString()
+      resizeEnd = resizeEventEndDate.format("YYYY-MM-DD HH:mm:ss");
+
+      axios.patch('/updateevent', { id: resizeID, start_time: resizeStart, end_time: resizeEnd, drag: false})
+      .then(() => {
+        this.getEvents()
+      });
+      axios.post('/eventchanged', {
+        id: resizeID,
+        start_time: resizeStart,
+        end_time: resizeEnd,
+      })
+      .then(() => {
+      })
+    },
+    closeModal() {
+      this.isModalVisible = false;
+      this.showAddEventModal = false;
+    },
+    deleteEventNow() {
+      axios.post('/deleteevent', {event_id: this.selectedEventId })
+      .then(() => {
+        this.closeModal()
+        this.getEvents()
+      })
     },
     clearEventList() {
       this.zippedEvent = []
-      const listID = document.getElementById("eventList")
-      if (listID.firstChild) {
-        while (listID.firstChild) listID.removeChild(listID.firstChild)
-      }
     },
+    //use function below but don't break it
+    // perhaps if userLoggedIN === true getCurrentUserID()
+    //currentResponse is acquiring the correct ID but only
+    //at first login of user, not after refresh of browser, errors
+    //that it does get after first login I don't recognize
+
     getCurrentUserID() {
       axios.get('/user')
       .then((response) => {
-        let currentResponse = response.data.usernames
-        for (let i = 0; i < currentResponse.length; i++) {
-          if (this.currentUser === currentResponse[i].username) {
-            this.currentUserID = currentResponse[i].id
-          }
-        }
+        //no console log here at first registration
+        this.currentUserID = response.data.usernames
+        console.log("currentuserid line    "   + this.currentUserID)
+        
       })
     },
     submitNewUsername() {
@@ -175,7 +258,7 @@ export default {
       // I included an "Update events" button to manually fix the problem.
       axios.post('/usersignup', { new_user: this.inputUserName })
       .then(() => {
-        this.currentUser = this.inputUserName
+        this.currentUser = this.inputUserName //Steve: this is a crucial part of the code already written
         this.inputUserName = ""
         this.getCurrentUserID()
         this.getEvents()
@@ -201,20 +284,48 @@ export default {
       axios.get('/getevents')
       .then((response) => {
         let currentResponse = response.data.all_events
+       
         for (let i = 0; i < currentResponse.length; i++) {
           if (this.currentUserID === currentResponse[i].owner_id) {
 
-            this.eventResponseNames.push(currentResponse[i].event_name)
-            this.eventResponseDetails.push(currentResponse[i].details)
-            this.eventResponseStartTime.push(currentResponse[i].start_time)
-            this.eventResponseEndTime.push(currentResponse[i].end_time)
-            this.eventResponseID.push(currentResponse[i].id)
+            this.eventResponseNames.push(currentResponse[i])
+            this.eventResponseDetails.push(currentResponse[i])
+            this.eventResponseStartTime.push(currentResponse[i])
+            this.eventResponseEndTime.push(currentResponse[i])
+            this.eventResponseID.push(currentResponse[i])
           }
         }
         for (let i = 0; i < this.eventResponseNames.length; i++) {
-          let stringConvertStartTime = this.eventResponseStartTime[i].toString()
-          let stringConvertEndTime = this.eventResponseEndTime[i].toString()
-          this.zippedEvent.push([stringConvertStartTime, stringConvertEndTime, this.eventResponseNames[i], this.eventResponseDetails[i], this.eventResponseID[i]])
+          //if the event is all day keep the time in utc, otherwise it will change the start time to the previous day **KS
+          let stringConvertStartTime = this.eventResponseStartTime[i].start_time
+          let stringConvertEndTime = this.eventResponseEndTime[i].end_time
+          if (!this.eventResponseStartTime[i].drag) {
+            if (this.eventResponseStartTime[i].all_day == false){
+              stringConvertStartTime = this.utcToLocalTime(stringConvertStartTime);
+              stringConvertEndTime = this.utcToLocalTime(stringConvertEndTime);
+            } 
+          } else {
+            stringConvertStartTime = this.utcToLocalTime(stringConvertStartTime);
+            stringConvertEndTime = this.utcToLocalTime(stringConvertEndTime);
+          }     
+             
+          //the zipped event must be in this format in order for calendarview to display it(as an object) **PK
+          
+          this.zippedEvent.push({
+            title: this.eventResponseNames[i].event_name, 
+            start: stringConvertStartTime,
+            end: stringConvertEndTime,
+            id: currentResponse[i].id,
+            extendedProps: {
+              title: this.eventResponseNames[i].event_name,
+              description: this.eventResponseDetails[i].details,
+              start: stringConvertStartTime,
+              end: stringConvertEndTime, 
+              id: currentResponse[i].id,
+            },
+            })
+            //  ** PK
+            //Maybe I will use these later? ** PK
         }
         this.eventResponseNames = []
         this.eventResponseDetails = []
@@ -222,62 +333,25 @@ export default {
         this.eventResponseEndTime = []
       })
     },
-
-    // API calls in the next two methods.
-    updateZones() {
-      axios.get("http://worldtimeapi.org/api/timezone")
-      .then((response) => {
-        this.zones = response.data
-        console.log(this.zones)
-      })
-    },
-    selectTimezone() {
-      this.chosenTimezoneName = this.zones[this.chosenTimezoneNumber]
-      axios.get(`http://worldtimeapi.org/api/timezone/${this.chosenTimezoneName}`)
-      .then((response) => {
-        this.chosenTimezoneString = moment(response.data.datetime).toString()
-      })
+    utcToLocalTime(date){
+      var stillUtc = moment.utc(date).toDate();
+      var local = moment(stillUtc).local().format('YYYY-MM-DD HH:mm:ss');
+      return local;
     }
+
+  },
+  mounted () {
+    this.checkSession();
   }
 }
+
+
+
 </script>
 
 <style>
-  #failedEntry {
-    color: red;
-  }
-  #app{
-    background-image: url("assets/photo-1455612693675-112974d4880b.jpeg");
-    background-size: 200px;
-  }
-  textarea {
-    border: 2px solid black;
-    background-color: lightgray;    
-  }
-  input {
-    border: 2px solid black;
-    background-color: lightgray;
-  }
-
-  /* this one actually works on the datetime picker */
-  input[type=text] {
-    border: 2px solid black;
-    background-color: lightgray;
-    font-weight: bold;
-  }
-  .check {
-    border: 2px solid black;
-  }
-  label {
-    font-weight: bold;
-  }
-  p {
-    font-weight: bold;
-  }
-  button {
-    font-weight: bold;
-  }
-  li {
-    font-weight: bold;
-  }
+  @import './assets/css/normalize.css';
+  @import url(https://fonts.googleapis.com/css?family=Roboto:400,900&display=swap);
+  @import './assets/css/styles.css';
+  
 </style>
