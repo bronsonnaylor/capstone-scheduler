@@ -1,9 +1,11 @@
 from app import create_app, setup_database
-from flask import render_template
+from flask import Flask, render_template, session
+
 
 def add_vue_routes(app):
     @app.route('/')
     def serve_vue_app():
+
         # Built files are auto injected.
         return(render_template('index.html'))
 
