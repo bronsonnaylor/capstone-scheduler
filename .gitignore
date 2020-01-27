@@ -2,4 +2,4 @@ client/node_modules
 db/*
 personal/*
 .env
-server/dist
+# server/dist
