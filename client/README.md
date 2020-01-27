@@ -45,11 +45,11 @@ The application will automatically watch for changes and update them.
 
 - Next navigate back to the root directory and then to the **server** directory. Run
 ~~~~
-python main.py
+pipenv run python main.py
 ~~~~
 Or alternatively, depending on how you installed python, you may have to run
 ~~~~
-python3 main.py
+pipenv run python3 main.py
 ~~~~
 
 - In your browser, navigate to *http://localhost:5000/*

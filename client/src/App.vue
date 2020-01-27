@@ -281,4 +281,7 @@ export default {
   li {
     font-weight: bold;
   }
+  #app {
+    padding: 10px;
+  }
 </style>
