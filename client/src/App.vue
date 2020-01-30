@@ -135,20 +135,15 @@ export default {
 
       axios.post('/newevent', { owner_id: this.currentUserID, event_name: this.eventName, event_details: this.eventDetails, event_start_time: this.startTime, event_end_time: this.endTime})
       .then(() => {
-        
+        this.getEvents()
       })
         this.eventName = ''
         this.eventDetails = ''
         this.startTime = ''
         this.range = ''
         this.endTime = ''
-        // this.getEvents()
     },
     deleteEvent(id) {
-      console.log("id ", id)
-      // There is currently an issue with the delete button failing to remove list items sometimes.
-      // Refreshing the page restores proper functionality.
-      // Update: perhaps it's related to a potential race condition, where the updated list isn't properly rendered in time.
       axios.delete('/deleteevent', {data: { event_id: id } })
       .then(() => {
         this.getEvents()
@@ -232,6 +227,7 @@ export default {
         this.eventResponseDetails = []
         this.eventResponseStartTime = []
         this.eventResponseEndTime = []
+        this.eventResponseID = []
       })
     },
 
@@ -249,6 +245,9 @@ export default {
         this.chosenTimezoneString = moment(response.data.datetime)
       })
     }
+  },
+  mounted() {
+    this.getEvents();
   }
 }
 </script>
