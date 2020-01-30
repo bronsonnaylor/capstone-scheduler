@@ -1,6 +1,6 @@
 <template>
   <div id="app">
-    <h1>Event scheduler</h1>
+    <h1>Event Scheduler</h1>
 
     <!-- Crude login -->
     <input v-if="this.currentUser == '' " v-model="inputUserName" v-on:keyup.enter="submitNewUsername"/>
@@ -10,8 +10,8 @@
     <hr>
 
     <!-- Make API call to find time at specific location -->
-    <input type="checkbox" class="check" id="timeCheckbox" v-model="timeCheckbox">
-    <label for="timeCheckbox">Check this box to find the current time for a specific location</label>
+    <!-- <input type="checkbox" class="check" id="timeCheckbox" v-model="timeCheckbox">
+    <label for="timeCheckbox">Check this box to find the current time for a specific location</label> -->
     <br>
     <div v-if="this.timeCheckbox == true">
       <button @click="updateZones" v-on:keyup.enter="updateZones">Update timezones</button>
@@ -25,12 +25,12 @@
 
     <!-- Enter event information -->
     <input type="checkbox" class="check" id="rangeCheckbox" v-model="checkbox">
-    <label for="rangeCheckbox">Check this box to select a start and end time.</label>
+    <label for="rangeCheckbox">Check this box to toggle selection type.</label>
     <br>
     <p v-if="!checkbox">Select start time.</p>
     <p v-if="checkbox">Select start and end time.</p>
-    <date-picker v-if="!checkbox" v-model="datetime" lang="en" confirm type="datetime"  format="YYYY-MM-DD HH:mm:ss" width="500" placeholder="Select Date and Time"></date-picker>
-    <date-picker v-if="checkbox" v-model="range" lang="en" range confirm type="datetime" format="YYYY-MM-DD HH:mm:ss" width="500" placeholder="Select Date and Time"></date-picker>
+    <date-picker v-if="!checkbox" v-model="datetime" lang="en" confirm type="datetime"  :format="momentFormat" width="500" placeholder="Select Date and Time"/>
+    <date-picker v-if="checkbox" v-model="range" lang="en" range confirm type="datetime" :format="momentFormat" width="500" placeholder="Select Date and Time"/>
     <p>Enter event name here.</p>
     <input v-model="eventName" v-on:keyup.enter="submitNewEvent"/>
     <p>Enter event details here.</p>
@@ -45,6 +45,7 @@
     <button @click="getEvents">Update my events</button>
     <br>
     <div id=eventList>
+      <!-- This section needs to be fixed to always sent correct id to delete event -->
       <ul v-for="(event, index) in zippedEvent" :key="index">
         <li> {{ event[0] }} </li>
         <li> {{ event[1] }} </li>
@@ -68,6 +69,14 @@ export default {
   name: 'app',
   data() {
     return {
+      momentFormat:{
+        stringify: (date) => {
+          return date ? moment(date).format('LL') : ''
+        },
+        parse: (value) => {
+          return value ? moment(valuse, 'LL').toDate() : null
+        }
+      },
       moment: moment,
       inputUserName: '',
       currentUser: '',
@@ -133,9 +142,10 @@ export default {
         this.startTime = ''
         this.range = ''
         this.endTime = ''
-        this.getEvents()
+        // this.getEvents()
     },
     deleteEvent(id) {
+      console.log("id ", id)
       // There is currently an issue with the delete button failing to remove list items sometimes.
       // Refreshing the page restores proper functionality.
       // Update: perhaps it's related to a potential race condition, where the updated list isn't properly rendered in time.
@@ -236,7 +246,7 @@ export default {
       this.chosenTimezoneName = this.zones[this.chosenTimezoneNumber]
       axios.get(`http://worldtimeapi.org/api/timezone/${this.chosenTimezoneName}`)
       .then((response) => {
-        this.chosenTimezoneString = moment(response.data.datetime).toString()
+        this.chosenTimezoneString = moment(response.data.datetime)
       })
     }
   }
